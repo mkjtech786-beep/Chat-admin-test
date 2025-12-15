@@ -25,9 +25,29 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-/* ----------- CHAT LOGIC ---------------- */
+/* ----------- VARIABLES ---------------- */
 let currentUser = null;
+let usersList = {};
 
+/* ----------- REALTIME USERS LIST ---------------- */
+onValue(ref(db, "chats"), snap => {
+  const usersDiv = document.querySelector(".users");
+  usersDiv.innerHTML = "";
+  usersList = {};
+
+  snap.forEach(child => {
+    const uid = child.key;
+    usersList[uid] = true;
+
+    const d = document.createElement("div");
+    d.className = "user";
+    d.innerText = uid;
+    d.onclick = () => openChat(uid);
+    usersDiv.appendChild(d);
+  });
+});
+
+/* ----------- OPEN CHAT ---------------- */
 window.openChat = (uid) => {
   currentUser = uid;
   document.getElementById("chatName").innerText = uid;
@@ -37,7 +57,7 @@ window.openChat = (uid) => {
     box.innerHTML = "";
     snap.forEach(m => {
       const d = document.createElement("div");
-      d.className = "msg admin";
+      d.className = m.val().from === "admin" ? "msg admin" : "msg user";
       d.innerText = m.val().text;
       box.appendChild(d);
     });
@@ -45,6 +65,7 @@ window.openChat = (uid) => {
   });
 };
 
+/* ----------- SEND MESSAGE ---------------- */
 window.sendMsg = () => {
   if (!currentUser) return alert("User select karo");
   const input = document.getElementById("text");
@@ -63,13 +84,14 @@ window.sendMsg = () => {
 <style>
 body{margin:0;font-family:Poppins;background:#0b0a1a;color:#fff}
 .app{display:flex;height:100vh}
-.users{width:260px;background:#140c2a;padding:16px}
+.users{width:260px;background:#140c2a;padding:16px;overflow:auto}
 .user{padding:10px;border-bottom:1px solid #333;cursor:pointer}
 .user:hover{background:#1f1440}
 .chat{flex:1;display:flex;flex-direction:column}
 .header{padding:14px;background:#120c22}
 .msgs{flex:1;padding:14px;overflow:auto}
 .msg{background:linear-gradient(135deg,#ff2f6d,#ff8a00);padding:10px;border-radius:14px;margin-bottom:8px;max-width:70%}
+.msg.user{background:linear-gradient(135deg,#1e90ff,#00d4ff);margin-left:auto}
 .input{display:flex;padding:10px}
 input{flex:1;padding:10px;border-radius:20px;border:none;outline:none}
 button{margin-left:10px;border:none;border-radius:50%;width:40px;background:#ff2f6d;color:#fff;font-size:18px}
@@ -78,10 +100,8 @@ button{margin-left:10px;border:none;border-radius:50%;width:40px;background:#ff2
 
 <body>
 <div class="app">
-
   <div class="users">
-    <div class="user" onclick="openChat('test')">test</div>
-    <div class="user" onclick="openChat('user2')">user2</div>
+    <!-- Users list will auto populate here -->
   </div>
 
   <div class="chat">
@@ -93,7 +113,6 @@ button{margin-left:10px;border:none;border-radius:50%;width:40px;background:#ff2
       <button onclick="sendMsg()">➤</button>
     </div>
   </div>
-
 </div>
 </body>
 </html>
