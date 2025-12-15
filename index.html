@@ -28,7 +28,7 @@ const db = getDatabase(app);
 /* ----------- VARIABLES ---------------- */
 let currentUser = null;
 
-/* ----------- REALTIME USERS LIST WITH ONLINE STATUS ---------------- */
+/* ----------- REALTIME USERS LIST ---------------- */
 const usersDiv = document.getElementById("users-list");
 
 function updateUsersList() {
@@ -37,16 +37,16 @@ function updateUsersList() {
     snap.forEach(child => {
       const uid = child.key;
       const userData = child.val();
-      
+
       const d = document.createElement("div");
       d.className = "user";
 
-      // Username text
+      // Username
       const nameSpan = document.createElement("span");
       nameSpan.innerText = uid;
       d.appendChild(nameSpan);
 
-      // Online indicator
+      // Online / Blocked indicator
       const online = document.createElement("span");
       online.className = "online";
       if (userData.blocked) {
@@ -65,15 +65,11 @@ function updateUsersList() {
       const blockBtn = document.createElement("button");
       blockBtn.className = "block-btn";
       blockBtn.innerText = userData.blocked ? "Unblock" : "Block";
-      blockBtn.onclick = () => {
-        update(ref(db, "chats/" + uid), { blocked: !userData.blocked });
-      };
+      blockBtn.onclick = () => update(ref(db, "chats/" + uid), { blocked: !userData.blocked });
       d.appendChild(blockBtn);
 
-      // Click to open chat
-      d.onclick = (e) => {
-        if (!e.target.classList.contains("block-btn")) openChat(uid);
-      };
+      // Open chat click
+      d.onclick = (e) => { if (!e.target.classList.contains("block-btn")) openChat(uid); };
 
       usersDiv.appendChild(d);
     });
@@ -92,9 +88,11 @@ window.openChat = (uid) => {
   onValue(ref(db, "chats/" + uid), snap => {
     msgsBox.innerHTML = "";
     snap.forEach(m => {
+      const val = m.val();
+      if (!val || !val.text) return; // skip non-message objects
       const d = document.createElement("div");
-      d.className = m.val().from === "admin" ? "msg admin" : "msg user";
-      d.innerText = m.val().text;
+      d.className = val.from === "admin" ? "msg admin" : "msg user";
+      d.innerText = val.text;
       msgsBox.appendChild(d);
     });
     msgsBox.scrollTop = msgsBox.scrollHeight;
@@ -104,7 +102,6 @@ window.openChat = (uid) => {
 /* ----------- SEND MESSAGE ---------------- */
 window.sendMsg = () => {
   if (!currentUser) return alert("User select karo");
-
   const input = document.getElementById("text");
   if (!input.value) return;
 
@@ -140,12 +137,9 @@ button{margin-left:10px;border:none;border-radius:50%;width:40px;background:#ff2
 
 <body>
 <div class="app">
-
   <div class="header">
     <div>Admin Chat</div>
-    <div class="users-container" id="users-list">
-      <!-- Users list will populate here -->
-    </div>
+    <div class="users-container" id="users-list"></div>
   </div>
 
   <div class="chat">
