@@ -9,7 +9,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
 /* ----------- FIREBASE ---------------- */
 const firebaseConfig = {
@@ -27,47 +27,84 @@ const db = getDatabase(app);
 
 /* ----------- VARIABLES ---------------- */
 let currentUser = null;
-let usersList = {};
 
-/* ----------- REALTIME USERS LIST ---------------- */
-onValue(ref(db, "chats"), snap => {
-  const usersDiv = document.querySelector(".users");
-  usersDiv.innerHTML = "";
-  usersList = {};
+/* ----------- REALTIME USERS LIST WITH ONLINE STATUS ---------------- */
+const usersDiv = document.getElementById("users-list");
 
-  snap.forEach(child => {
-    const uid = child.key;
-    usersList[uid] = true;
+function updateUsersList() {
+  onValue(ref(db, "chats"), snap => {
+    usersDiv.innerHTML = "";
+    snap.forEach(child => {
+      const uid = child.key;
+      const userData = child.val();
+      
+      const d = document.createElement("div");
+      d.className = "user";
 
-    const d = document.createElement("div");
-    d.className = "user";
-    d.innerText = uid;
-    d.onclick = () => openChat(uid);
-    usersDiv.appendChild(d);
+      // Username text
+      const nameSpan = document.createElement("span");
+      nameSpan.innerText = uid;
+      d.appendChild(nameSpan);
+
+      // Online indicator
+      const online = document.createElement("span");
+      online.className = "online";
+      if (userData.blocked) {
+        online.style.background = "gray";
+        online.title = "Blocked";
+      } else if (userData.lastActive && (Date.now() - userData.lastActive < 60000)) {
+        online.style.background = "lime";
+        online.title = "Online";
+      } else {
+        online.style.background = "red";
+        online.title = "Offline";
+      }
+      d.appendChild(online);
+
+      // Block/Unblock button
+      const blockBtn = document.createElement("button");
+      blockBtn.className = "block-btn";
+      blockBtn.innerText = userData.blocked ? "Unblock" : "Block";
+      blockBtn.onclick = () => {
+        update(ref(db, "chats/" + uid), { blocked: !userData.blocked });
+      };
+      d.appendChild(blockBtn);
+
+      // Click to open chat
+      d.onclick = (e) => {
+        if (!e.target.classList.contains("block-btn")) openChat(uid);
+      };
+
+      usersDiv.appendChild(d);
+    });
   });
-});
+}
+
+updateUsersList();
 
 /* ----------- OPEN CHAT ---------------- */
+const msgsBox = document.getElementById("msgs");
+
 window.openChat = (uid) => {
   currentUser = uid;
   document.getElementById("chatName").innerText = uid;
 
   onValue(ref(db, "chats/" + uid), snap => {
-    const box = document.getElementById("msgs");
-    box.innerHTML = "";
+    msgsBox.innerHTML = "";
     snap.forEach(m => {
       const d = document.createElement("div");
       d.className = m.val().from === "admin" ? "msg admin" : "msg user";
       d.innerText = m.val().text;
-      box.appendChild(d);
+      msgsBox.appendChild(d);
     });
-    box.scrollTop = box.scrollHeight;
+    msgsBox.scrollTop = msgsBox.scrollHeight;
   });
 };
 
 /* ----------- SEND MESSAGE ---------------- */
 window.sendMsg = () => {
   if (!currentUser) return alert("User select karo");
+
   const input = document.getElementById("text");
   if (!input.value) return;
 
@@ -83,12 +120,15 @@ window.sendMsg = () => {
 
 <style>
 body{margin:0;font-family:Poppins;background:#0b0a1a;color:#fff}
-.app{display:flex;height:100vh}
-.users{width:260px;background:#140c2a;padding:16px;overflow:auto}
-.user{padding:10px;border-bottom:1px solid #333;cursor:pointer}
+.header{padding:14px;background:#120c22;text-align:center;display:flex;flex-direction:column;align-items:center;}
+.users-container{display:flex;justify-content:center;margin-top:10px;flex-wrap:wrap}
+.user{display:flex;align-items:center;margin:4px;padding:6px 12px;background:#140c2a;border-radius:12px;cursor:pointer;position:relative}
 .user:hover{background:#1f1440}
-.chat{flex:1;display:flex;flex-direction:column}
-.header{padding:14px;background:#120c22}
+.user span{margin-right:8px}
+.online{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px}
+.block-btn{margin-left:6px;padding:2px 6px;border:none;border-radius:6px;background:#ff2f6d;color:#fff;font-size:12px;cursor:pointer}
+.app{display:flex;flex-direction:column;height:100vh}
+.chat{flex:1;display:flex;flex-direction:column;margin-top:10px}
 .msgs{flex:1;padding:14px;overflow:auto}
 .msg{background:linear-gradient(135deg,#ff2f6d,#ff8a00);padding:10px;border-radius:14px;margin-bottom:8px;max-width:70%}
 .msg.user{background:linear-gradient(135deg,#1e90ff,#00d4ff);margin-left:auto}
@@ -100,8 +140,12 @@ button{margin-left:10px;border:none;border-radius:50%;width:40px;background:#ff2
 
 <body>
 <div class="app">
-  <div class="users">
-    <!-- Users list will auto populate here -->
+
+  <div class="header">
+    <div>Admin Chat</div>
+    <div class="users-container" id="users-list">
+      <!-- Users list will populate here -->
+    </div>
   </div>
 
   <div class="chat">
